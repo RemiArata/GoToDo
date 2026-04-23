@@ -62,7 +62,11 @@ type UpdateToDo struct {
 
 func init() {
 	fmt.Println("initalizing the db")
-	rnd = renderer.New()
+	rnd = renderer.New(
+		renderer.Options{
+			ParseGlobPattern: "html/*.html",
+		},
+	)
 	var err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -84,6 +88,9 @@ func main() {
 	// Create the router
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
+
+	fs := http.FileServer(http.Dir("./static"))
+	router.Handle("/static/*", http.StripPrefix("/static/", fs))
 	router.Get("/", homeHandler)
 	router.Mount("/todo", todoHandlers())
 
@@ -128,8 +135,10 @@ func main() {
 }
 
 func homeHandler(rw http.ResponseWriter, r *http.Request) {
-	filepath := "./README.md"
-	err := rnd.FileView(rw, http.StatusOK, filepath, "readme.md")
+	// filepath := "./README.md"
+	// err := rnd.FileView(rw, http.StatusOK, filepath, "readme.md")
+
+	err := rnd.HTML(rw, http.StatusOK, "indexPage", nil)
 	if err != nil {
 		log.Fatalf("OH NO! An error: %v", err)
 	}
@@ -274,17 +283,17 @@ func deleteToDo(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filter := bson.M("id": res)
+	filter := bson.M{"id": res}
 	if data, err := db.Collection(collectionName).DeleteOne(r.Context(), filter); err != nil {
 		log.Printf("Could not delete item from db %v", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, renderer.M{
 			"message": "an error occurred when deleting todo item",
-			"error": err.Error(),
+			"error":   err.Error(),
 		})
 	} else {
 		rnd.JSON(rw, http.StatusOK, renderer.M{
 			"message": "successfully deleted todo",
-			"data": data
+			"data":    data,
 		})
 	}
 
